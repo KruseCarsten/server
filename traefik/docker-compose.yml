@@ -1,0 +1,50 @@
+version: "3"
+
+services:
+##
+# Container setup is done within env-file
+  traefik:
+    container_name: traefik
+    image: ${TRAEFIK_IMAGE:-docker.io/traefik:v3.0}
+    domainname: ${DUCKDNS_SUBDOMAIN:-test}.${DUCKDNS_TLD:-duckdns.org}
+    mem_limit: ${TRAEFIK_MEM_LIMIT:-"1g"}
+    mem_reservation: ${TRAEFIK_MEM_RESERVATION:-"64m"}
+    restart: ${TRAEFIK_IMAGE_RESTART:-unless-stopped}
+    security_opt:
+      - no-new-privileges=true
+    networks:
+      proxy:
+        ipv4_address: ${TRAEFIK_IPv4_ADR:-'10.89.0.10'}
+    extra_hosts:
+      - host.containers.internal:${TRAEFIK_HOST_IP:-192.168.0.10}
+    ports:
+      - ${TRAEFIK_PORT_HTTP}:80     # HTTP
+      - ${TRAEFIK_PORT_HTTPS}:443   # HTTPS
+      - ${TRAEFIK_PORT_ADMIN}:8080  # Web-UI (enabled by --api.insecure=true)
+    env_file:
+      - ../.global.d/.env.global    # Global parameter
+      - .env.traefik                # Service parameter
+    volumes:
+      #Socket listen for docker/podman events (traefik labels)
+      - ${PWD}/traefik.yml:/etc/traefik/traefik.yaml:Z  # static traefik configuration
+      - ${PWD}/traefik.conf.d:/etc/traefik/dynamic.d:z  # dynamic traefik configuration
+      - ${PWD}/acme.json:/etc/traefik/acme.json:Z       # TLS certificate storage
+      - ${PWD}/certs.d:/etc/traefik/certs:z             # Certificates
+      - ${CONTAINER_SOCKET_PATH}:/var/run/docker.sock:z # podman or docker socket
+      - ${TRAEFIK_LOG_PATH}:/var/log:z                  # traefik log file
+    labels:
+      - "io.containers.autoupdate=registry"
+      - "traefik.enable=true"
+      - "traefik.docker.network=${NETWORK_NAME:-proxy}" # @traefik.yml
+
+      - "traefik.http.routers.traefik.rule=Host(`${TRAEFIK_SUBSUBDOMAIN}.${DUCKDNS_SUBDOMAIN}.${DUCKDNS_TLD}`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.entrypoints=web,websecure"
+      - "traefik.http.routers.traefik.middlewares=whitelist@file"
+      - "traefik.http.services.traefik.loadbalancer.server.port=${TRAEFIK_PORT_ADMIN}"
+
+networks:
+  proxy:
+    external: true
+    name: ${NETWORK_NAME:-proxy} # create this network before running this deployment:
+                                 # docker network create proxy

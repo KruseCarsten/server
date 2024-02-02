@@ -1,0 +1,72 @@
+---
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: false # disable this if you don't want to send anonymous usage data to traefik
+
+
+accessLog:  # uncomment this line to enable access log
+  filePath: "/var/log/access.log"
+
+log:
+  level: DEBUG  # ERROR, DEBUG, PANIC, FATAL, ERROR, WARN, INFO
+  filePath: "/var/log/traefik.log"
+
+
+api:
+  dashboard: true       # if you don't need the dashboard disable it
+  debug: true
+  insecure: true        # Not for production
+
+
+providers:
+
+  docker:
+    exposedByDefault: false
+    endpoint: 'unix:///var/run/docker.sock'
+    network: proxy      # Configured as NETWORK_NAME
+
+  file:
+    directory: "/etc/traefik/dynamic.d"
+    watch: true
+
+
+entryPoints:
+  web:
+    address: ':80' # http, configured as TRAEFIK_PORT_HTTP
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  websecure:
+    address: ':443' # https, configured like TRAEFIK_PORT_HTTPS
+    http:
+      middlewares:
+        - secHeaders@file            #Security header, e.g. HSTS
+        - autodetectContenttype@file #Traefik v3, header autodetection behavior
+      tls:
+        certresolver: duckdns
+        domains:
+          - main: "*.test.duckdns.org"  #--> Must be configured as DUCKDNS_SUBDOMAIN, DUCKDNS_TLD 
+
+
+certificatesResolvers:
+  duckdns:
+    acme:
+    #  caServer: https://acme-staging-v02.api.letsencrypt.org/directory # IMPORTANT: uncomment this line to get production ready certificates. After this, clear acme.json file.
+      email: "owner@domain.com"                                         #--> Should be configured
+      storage: /etc/traefik/acme.json                                   # chmod 600 this file on the host system
+      ## dnsChallenge:
+      dnsChallenge:
+        provider: duckdns                                               # see https://doc.traefik.io/traefik/https/acme/#dnschallenge
+      #  delayBeforeCheck: 10
+        resolvers:
+          - "1.1.1.1:53"
+          - "8.8.8.8:53"
+    #  ## tlsChallenge
+    #  tlsChallenge: {}
+    #  ## httpChallenge
+    #  httpChallenge:
+    #    entryPoint: web

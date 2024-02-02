@@ -1,0 +1,30 @@
+version: "3"
+
+services:
+##
+# Container setup is done within env-file
+  dns:
+    container_name: duckdns
+    image: ${DUCKDNS_IMAGE:-lscr.io/linuxserver/duckdns:latest}
+    mem_limit: ${DUCKDNS_MEM_LIMIT=-256m}
+    mem_reservation: ${DUCKDNS_MEM_RESERVATION:-168m}
+    restart: ${DUCKDNS_IMAGE_RESTART:-unless-stopped}
+    networks:
+      proxy:
+        ipv4_address: ${DUCKDNS_IPv4_ADR:-10.88.0.11}
+    env_file:
+      - ../.global.d/.env.global  # Global parameter
+      - .env.duckdns              # Service parameter
+    environment:
+      - TZ=${TZ:-Europe/Berlin}
+      - SUBDOMAINS=${DUCKDNS_SUBDOMAIN:-test}
+      - TOKEN=${DUCKDNS_TOKEN}
+      - LOG_FILE=${DUCKDNS_LOG_ENABLE:-true}
+    volumes:
+      - ${PWD}/dns.d:/config:z
+
+networks:
+  proxy:
+    external: true
+    name: ${NETWORK_NAME:-proxy} # create this network before running this deployment:
+                                 # docker network create proxy
