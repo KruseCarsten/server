@@ -23,6 +23,7 @@ services:
       - ${TRAEFIK_PORT_ADMIN}:8080  # Web-UI (enabled by --api.insecure=true)
     env_file:
       - ../.global.d/.env.global    # Global parameter
+      - ../duckdns/.env.duckdns     # Additional parameter from other service
       - .env.traefik                # Service parameter
     volumes:
       #Socket listen for docker/podman events (traefik labels)
